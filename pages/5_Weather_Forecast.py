@@ -66,7 +66,34 @@ with col_options:
         st.metric("Latitude",  f"{lat}°N")
         st.metric("Longitude", f"{lon}°E")
 
+# ── Coordinate validation helper ──────────────────────────────
+def invalid_msg(errors):
+    items = "".join(f"<li style='margin:4px 0;'>{e}</li>" for e in errors)
+    st.markdown(f"""
+    <div style="background:linear-gradient(135deg,#2A0D0D,#1A0909);border:2px solid #D32F2F;
+                border-radius:16px;padding:1.5rem 2rem;margin-top:1rem;">
+        <div style="font-size:2rem;text-align:center;">🚫</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:800;
+                    color:#EF5350;text-align:center;margin:0.4rem 0 1rem;">Invalid Input</div>
+        <ul style="color:#FFCDD2;font-size:0.9rem;line-height:1.8;padding-left:1.2rem;">{items}</ul>
+        <div style="color:#EF9A9A;font-size:0.8rem;margin-top:0.8rem;text-align:center;">
+            Please correct the highlighted fields and try again.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+coord_errors = []
+if city == "Custom":
+    if not (-90.0 <= lat <= 90.0):
+        coord_errors.append(f"Latitude must be between -90° and 90° (entered: {lat}).")
+    if not (-180.0 <= lon <= 180.0):
+        coord_errors.append(f"Longitude must be between -180° and 180° (entered: {lon}).")
+
 fetch_btn = st.button("🌐 Fetch Weather Data", use_container_width=False)
+
+if coord_errors:
+    invalid_msg(coord_errors)
+    st.stop()
 
 @st.cache_data(ttl=1800)
 def fetch_weather(lat, lon):

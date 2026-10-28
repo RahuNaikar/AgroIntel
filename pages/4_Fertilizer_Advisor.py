@@ -215,36 +215,69 @@ with col_right:
     )
     st.plotly_chart(fig2, use_container_width=True)
 
-if predict_btn:
-    try:
-        soil_enc = encoders["soil"].transform([soil_type])[0]
-        crop_enc = encoders["crop"].transform([crop_type])[0]
-    except:
-        soil_enc = SOIL_TYPES.index(soil_type)
-        crop_enc = CROP_TYPES.index(crop_type)
-
-    X = np.array([[temperature, humidity, moisture, soil_enc, crop_enc, nitrogen, potassium, phosphorous]])
-    pred_enc  = fert_model.predict(X)[0]
-    fert_name = encoders["fert"].inverse_transform([pred_enc])[0]
-
-    finfo = FERTILIZER_INFO.get(fert_name, {"npk":"N/A","desc":"Apply as recommended by local agronomist.","icon":"🌿"})
-
+# ── Validation helper ─────────────────────────────────────────
+def invalid_msg(errors):
+    items = "".join(f"<li style='margin:4px 0;'>{e}</li>" for e in errors)
     st.markdown(f"""
-    <div class="fert-result">
-        <div style="font-size:3rem;">{finfo['icon']}</div>
-        <div style="font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:800;color:#B9F6CA;">
-            {fert_name}
-        </div>
-        <div style="background:#0A1A0A;border-radius:10px;padding:0.6rem 1.2rem;display:inline-block;margin:0.8rem 0;">
-            <span style="color:#76FF03;font-weight:700;">NPK Ratio: {finfo['npk']}</span>
-        </div>
-        <div style="color:#A5D6A7;font-size:0.9rem;line-height:1.6;max-width:500px;margin:0 auto;">
-            {finfo['desc']}
+    <div style="background:linear-gradient(135deg,#2A0D0D,#1A0909);border:2px solid #D32F2F;
+                border-radius:16px;padding:1.5rem 2rem;margin-top:1rem;">
+        <div style="font-size:2rem;text-align:center;">🚫</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:800;
+                    color:#EF5350;text-align:center;margin:0.4rem 0 1rem;">Invalid Input</div>
+        <ul style="color:#FFCDD2;font-size:0.9rem;line-height:1.8;padding-left:1.2rem;">{items}</ul>
+        <div style="color:#EF9A9A;font-size:0.8rem;margin-top:0.8rem;text-align:center;">
+            Please correct the highlighted fields and try again.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    c1, c2, c3 = st.columns(3)
-    c1.metric("Soil Type",   soil_type)
-    c2.metric("Crop",        crop_type)
-    c3.metric("Recommended", fert_name)
+if predict_btn:
+    errors = []
+    if not (10.0 <= temperature <= 45.0):
+        errors.append(f"Temperature must be between 10°C and 45°C (entered: {temperature}°C).")
+    if not (10.0 <= humidity <= 100.0):
+        errors.append(f"Humidity must be between 10% and 100% (entered: {humidity}%).")
+    if not (0.0 <= moisture <= 100.0):
+        errors.append(f"Soil Moisture must be between 0% and 100% (entered: {moisture}%).")
+    if not (0 <= nitrogen <= 140):
+        errors.append(f"Nitrogen (N) must be between 0 and 140 (entered: {nitrogen}).")
+    if not (0 <= phosphorous <= 145):
+        errors.append(f"Phosphorous (P) must be between 0 and 145 (entered: {phosphorous}).")
+    if not (0 <= potassium <= 205):
+        errors.append(f"Potassium (K) must be between 0 and 205 (entered: {potassium}).")
+
+    if errors:
+        invalid_msg(errors)
+    else:
+        try:
+            soil_enc = encoders["soil"].transform([soil_type])[0]
+            crop_enc = encoders["crop"].transform([crop_type])[0]
+        except:
+            soil_enc = SOIL_TYPES.index(soil_type)
+            crop_enc = CROP_TYPES.index(crop_type)
+
+        X = np.array([[temperature, humidity, moisture, soil_enc, crop_enc, nitrogen, potassium, phosphorous]])
+        pred_enc  = fert_model.predict(X)[0]
+        fert_name = encoders["fert"].inverse_transform([pred_enc])[0]
+
+        finfo = FERTILIZER_INFO.get(fert_name, {"npk":"N/A","desc":"Apply as recommended by local agronomist.","icon":"🌿"})
+
+        st.markdown(f"""
+        <div class="fert-result">
+            <div style="font-size:3rem;">{finfo['icon']}</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:800;color:#B9F6CA;">
+                {fert_name}
+            </div>
+            <div style="background:#0A1A0A;border-radius:10px;padding:0.6rem 1.2rem;display:inline-block;margin:0.8rem 0;">
+                <span style="color:#76FF03;font-weight:700;">NPK Ratio: {finfo['npk']}</span>
+            </div>
+            <div style="color:#A5D6A7;font-size:0.9rem;line-height:1.6;max-width:500px;margin:0 auto;">
+                {finfo['desc']}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        c1, c2, c3 = st.columns(3)
+        c1.metric("Soil Type",   soil_type)
+        c2.metric("Crop",        crop_type)
+        c3.metric("Recommended", fert_name)

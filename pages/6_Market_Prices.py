@@ -78,80 +78,134 @@ with col_chart:
     period_days = {"Last 3 Months":90,"Last 6 Months":180,"Last 1 Year":365,"All Time":9999}[period]
     cutoff = mkt["date"].max() - timedelta(days=period_days)
 
-    fig = go.Figure()
-    colors = px.colors.qualitative.Prism
-    for i, crop in enumerate(sel):
-        sub = mkt[(mkt["crop"]==crop) & (mkt["date"]>=cutoff)].copy()
-        # Moving average
-        sub["ma4"] = sub["price_per_quintal"].rolling(4).mean()
-        fig.add_trace(go.Scatter(
-            x=sub["date"], y=sub["price_per_quintal"], name=crop,
-            mode="lines", line=dict(color=colors[i%len(colors)], width=1.5, dash="dot"),
-            opacity=0.5,
-        ))
-        fig.add_trace(go.Scatter(
-            x=sub["date"], y=sub["ma4"], name=f"{crop} (4W MA)",
-            mode="lines", line=dict(color=colors[i%len(colors)], width=2.5),
-            showlegend=False,
-        ))
+    if not sel:
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#2A0D0D,#1A0909);border:2px solid #D32F2F;
+                    border-radius:16px;padding:1.5rem 2rem;margin-top:1rem;text-align:center;">
+            <div style="font-size:2rem;">🚫</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:1.2rem;font-weight:800;
+                        color:#EF5350;margin:0.4rem 0 0.5rem;">Invalid Selection</div>
+            <div style="color:#FFCDD2;font-size:0.9rem;">
+                Please select at least one crop from the list above to view the price trend chart.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        fig = go.Figure()
+        colors = px.colors.qualitative.Prism
+        for i, crop in enumerate(sel):
+            sub = mkt[(mkt["crop"]==crop) & (mkt["date"]>=cutoff)].copy()
+            # Moving average
+            sub["ma4"] = sub["price_per_quintal"].rolling(4).mean()
+            fig.add_trace(go.Scatter(
+                x=sub["date"], y=sub["price_per_quintal"], name=crop,
+                mode="lines", line=dict(color=colors[i%len(colors)], width=1.5, dash="dot"),
+                opacity=0.5,
+            ))
+            fig.add_trace(go.Scatter(
+                x=sub["date"], y=sub["ma4"], name=f"{crop} (4W MA)",
+                mode="lines", line=dict(color=colors[i%len(colors)], width=2.5),
+                showlegend=False,
+            ))
 
-    fig = dark_layout(fig, "Crop Prices (₹/Quintal) with 4-Week Moving Average")
-    fig.update_layout(height=420, hovermode="x unified")
-    st.plotly_chart(fig, use_container_width=True)
+        fig = dark_layout(fig, "Crop Prices (₹/Quintal) with 4-Week Moving Average")
+        fig.update_layout(height=420, hovermode="x unified")
+        st.plotly_chart(fig, use_container_width=True)
 
 with col_analysis:
     st.markdown('<div class="section-header">🔍 Price Analysis</div>', unsafe_allow_html=True)
-    crop_sel = st.selectbox("Analyze Crop", crops, key="analysis_crop")
-    sub_a = mkt[mkt["crop"] == crop_sel].copy()
-    sub_a["month"] = sub_a["date"].dt.month
+    crop_sel = st.selectbox(
+        "Analyze Crop",
+        options=["-- Select a crop --"] + crops,
+        index=0,
+        key="analysis_crop"
+    )
 
-    latest_price = sub_a["price_per_quintal"].iloc[-1]
-    avg_price    = sub_a["price_per_quintal"].mean()
-    max_price    = sub_a["price_per_quintal"].max()
-    min_price    = sub_a["price_per_quintal"].min()
-    trend_3m     = sub_a.tail(12)["price_per_quintal"]
-    trend_pct    = ((trend_3m.iloc[-1] - trend_3m.iloc[0]) / trend_3m.iloc[0]) * 100
+    if crop_sel == "-- Select a crop --":
+        st.markdown("""
+        <div style="background:linear-gradient(135deg,#2A0D0D,#1A0909);border:2px solid #D32F2F;
+                    border-radius:14px;padding:1.5rem;margin-top:1rem;text-align:center;">
+            <div style="font-size:2rem;">🚫</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:1.1rem;font-weight:800;
+                        color:#EF5350;margin:0.4rem 0;">Invalid Entry</div>
+            <div style="color:#FFCDD2;font-size:0.85rem;line-height:1.6;">
+                No crop selected for analysis.<br><br>
+                💡 Please select a <b>crop</b> from the dropdown above
+                to view its price trends, statistics, and best selling month.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        sub_a = mkt[mkt["crop"] == crop_sel].copy()
+        sub_a["month"] = sub_a["date"].dt.month
 
-    st.metric("Current Price",  f"₹{latest_price:,.0f}", f"{trend_pct:+.1f}% (3M)")
-    st.metric("Average Price",  f"₹{avg_price:,.0f}")
-    st.metric("52W High",       f"₹{max_price:,.0f}")
-    st.metric("52W Low",        f"₹{min_price:,.0f}")
+        latest_price = sub_a["price_per_quintal"].iloc[-1]
+        avg_price    = sub_a["price_per_quintal"].mean()
+        max_price    = sub_a["price_per_quintal"].max()
+        min_price    = sub_a["price_per_quintal"].min()
+        trend_3m     = sub_a.tail(12)["price_per_quintal"]
+        trend_pct    = ((trend_3m.iloc[-1] - trend_3m.iloc[0]) / trend_3m.iloc[0]) * 100
 
-    # Seasonality
-    monthly = sub_a.groupby("month")["price_per_quintal"].mean().reset_index()
-    best_month = monthly.loc[monthly["price_per_quintal"].idxmax(), "month"]
-    month_names = {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
-                   7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"}
+        st.metric("Current Price",  f"₹{latest_price:,.0f}", f"{trend_pct:+.1f}% (3M)")
+        st.metric("Average Price",  f"₹{avg_price:,.0f}")
+        st.metric("52W High",       f"₹{max_price:,.0f}")
+        st.metric("52W Low",        f"₹{min_price:,.0f}")
 
-    st.markdown(f"""
-    <div class="ag-card" style="margin-top:1rem;">
-        <div style="font-weight:700;color:#F4FF81;margin-bottom:0.5rem;">🎯 Best Selling Month</div>
-        <div style="font-size:1.8rem;font-weight:800;color:#00C853;">{month_names[best_month]}</div>
-        <div style="color:#81C784;font-size:0.85rem;">Historically highest prices for {crop_sel}</div>
-    </div>
-    """, unsafe_allow_html=True)
+        # Seasonality
+        monthly = sub_a.groupby("month")["price_per_quintal"].mean().reset_index()
+        best_month = monthly.loc[monthly["price_per_quintal"].idxmax(), "month"]
+        month_names = {1:"Jan",2:"Feb",3:"Mar",4:"Apr",5:"May",6:"Jun",
+                       7:"Jul",8:"Aug",9:"Sep",10:"Oct",11:"Nov",12:"Dec"}
 
-    # Monthly seasonality bar
-    fig4 = go.Figure(go.Bar(
-        x=[month_names[m] for m in monthly["month"]],
-        y=monthly["price_per_quintal"],
-        marker=dict(color=monthly["price_per_quintal"],
-                    colorscale=[[0,"#1B5E20"],[0.5,"#388E3C"],[1,"#F4FF81"]], showscale=False),
-    ))
-    fig4 = dark_layout(fig4, f"{crop_sel} – Seasonal Price Pattern")
-    fig4.update_layout(height=250, margin=dict(l=20,r=10,t=40,b=20))
-    st.plotly_chart(fig4, use_container_width=True)
+        st.markdown(f"""
+        <div class="ag-card" style="margin-top:1rem;">
+            <div style="font-weight:700;color:#F4FF81;margin-bottom:0.5rem;">🎯 Best Selling Month</div>
+            <div style="font-size:1.8rem;font-weight:800;color:#00C853;">{month_names[best_month]}</div>
+            <div style="color:#81C784;font-size:0.85rem;">Historically highest prices for {crop_sel}</div>
+        </div>
+        """, unsafe_allow_html=True)
 
-# ── Volatility heatmap ────────────────────────────────────────
-st.markdown('<div class="section-header">📊 Price Volatility Heatmap</div>', unsafe_allow_html=True)
-mkt_recent = mkt[mkt["date"] >= mkt["date"].max() - timedelta(days=365)]
-pivot = mkt_recent.pivot_table(index=mkt_recent["date"].dt.strftime("%b %Y"),
-                                columns="crop", values="price_per_quintal", aggfunc="mean")
-fig5 = go.Figure(go.Heatmap(
-    z=pivot.values, x=pivot.columns, y=pivot.index,
-    colorscale=[[0,"#0D1F0D"],[0.5,"#2E7D32"],[1,"#F4FF81"]],
-    showscale=True,
-))
-fig5 = dark_layout(fig5, "Average Monthly Prices by Crop (₹/Quintal)")
-fig5.update_layout(height=380)
-st.plotly_chart(fig5, use_container_width=True)
+        # Monthly seasonality bar
+        fig4 = go.Figure(go.Bar(
+            x=[month_names[m] for m in monthly["month"]],
+            y=monthly["price_per_quintal"],
+            marker=dict(color=monthly["price_per_quintal"],
+                        colorscale=[[0,"#1B5E20"],[0.5,"#388E3C"],[1,"#F4FF81"]], showscale=False),
+        ))
+        fig4 = dark_layout(fig4, f"{crop_sel} – Seasonal Price Pattern")
+        fig4.update_layout(height=250, margin=dict(l=20,r=10,t=40,b=20))
+        st.plotly_chart(fig4, use_container_width=True)
+
+# ── Price Summary Table ───────────────────────────────────────
+st.markdown('<div class="section-header">📋 Crop Price Summary</div>', unsafe_allow_html=True)
+
+summary_cols = st.columns(len(crops))
+for i, crop_name in enumerate(crops):
+    sub = mkt[mkt["crop"] == crop_name]
+    current = sub["price_per_quintal"].iloc[-1]
+    avg     = sub["price_per_quintal"].mean()
+    high    = sub["price_per_quintal"].max()
+    low     = sub["price_per_quintal"].min()
+    prev    = sub["price_per_quintal"].iloc[-2]
+    change  = ((current - prev) / prev) * 100
+    arrow   = "▲" if change >= 0 else "▼"
+    clr     = "#00C853" if change >= 0 else "#EF5350"
+
+    with summary_cols[i]:
+        st.markdown(f"""
+        <div style="background:linear-gradient(135deg,#0D1F0D,#0A150A);border:1px solid #2E7D32;
+                    border-radius:14px;padding:1rem;text-align:center;margin-bottom:0.5rem;">
+            <div style="font-size:0.8rem;font-weight:700;color:#A5D6A7;margin-bottom:0.5rem;">
+                🌾 {crop_name}
+            </div>
+            <div style="font-size:1.4rem;font-weight:800;color:#F4FF81;">₹{current:,.0f}</div>
+            <div style="font-size:0.75rem;color:{clr};font-weight:600;margin-bottom:0.6rem;">
+                {arrow} {abs(change):.1f}%
+            </div>
+            <div style="font-size:0.72rem;color:#81C784;line-height:1.9;">
+                Avg&nbsp;&nbsp;₹{avg:,.0f}<br>
+                High ₹{high:,.0f}<br>
+                Low&nbsp;&nbsp;₹{low:,.0f}
+            </div>
+        </div>
+        """, unsafe_allow_html=True)

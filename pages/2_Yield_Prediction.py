@@ -91,60 +91,93 @@ with col_right:
         fig2.update_layout(height=300, coloraxis_showscale=False)
         st.plotly_chart(fig2, use_container_width=True)
 
-if predict_btn:
-    try:
-        crop_enc   = encoders["crop"].transform([crop])[0]
-        state_enc  = encoders["state"].transform([state])[0]
-        season_enc = encoders["season"].transform([season])[0]
-    except:
-        crop_enc   = CROPS.index(crop)
-        state_enc  = STATES.index(state)
-        season_enc = SEASONS.index(season)
-
-    X = np.array([[crop_enc, state_enc, season_enc, area, rainfall, temperature, fertilizer, pesticide]])
-    pred = float(yield_model.predict(X)[0])
-    total = pred * area
-
-    st.markdown('<div class="section-header">🎯 Prediction Results</div>', unsafe_allow_html=True)
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Yield (tons/ha)", f"{pred:.2f}")
-    c2.metric("Total Yield",     f"{total:.1f} tons")
-    c3.metric("Farm Area",       f"{area} ha")
-    c4.metric("Season",          season)
-
+# ── Validation helper ─────────────────────────────────────────
+def invalid_msg(errors):
+    items = "".join(f"<li style='margin:4px 0;'>{e}</li>" for e in errors)
     st.markdown(f"""
-    <div class="result-card">
-        <div style="font-size:3.5rem;">🌾</div>
-        <div style="font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:800;color:#76FF03;">
-            {pred:.2f} <span style="font-size:1rem;">tons/ha</span>
-        </div>
-        <div style="color:#81C784;margin-top:0.5rem;">Expected Yield for {crop} in {season} season, {state}</div>
-        <div style="margin-top:1rem;color:#A5D6A7;">
-            📦 Total production on <b>{area} ha</b> farm: <b style="color:#00C853;">{total:.1f} tons</b>
+    <div style="background:linear-gradient(135deg,#2A0D0D,#1A0909);border:2px solid #D32F2F;
+                border-radius:16px;padding:1.5rem 2rem;margin-top:1rem;">
+        <div style="font-size:2rem;text-align:center;">🚫</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:800;
+                    color:#EF5350;text-align:center;margin:0.4rem 0 1rem;">Invalid Input</div>
+        <ul style="color:#FFCDD2;font-size:0.9rem;line-height:1.8;padding-left:1.2rem;">{items}</ul>
+        <div style="color:#EF9A9A;font-size:0.8rem;margin-top:0.8rem;text-align:center;">
+            Please correct the highlighted fields and try again.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Sensitivity analysis
-    st.markdown('<div class="section-header">📉 Fertilizer Sensitivity Analysis</div>', unsafe_allow_html=True)
-    fert_range = np.linspace(50, 450, 20)
-    preds = []
-    for fv in fert_range:
-        Xv = np.array([[crop_enc, state_enc, season_enc, area, rainfall, temperature, fv, pesticide]])
-        preds.append(float(yield_model.predict(Xv)[0]))
+if predict_btn:
+    errors = []
+    if area <= 0:
+        errors.append("Farm Area must be greater than 0 hectares.")
+    if area > 100:
+        errors.append("Farm Area cannot exceed 100 hectares.")
+    if not (50.0 <= rainfall <= 2000.0):
+        errors.append(f"Seasonal Rainfall must be between 50mm and 2000mm (entered: {rainfall}mm).")
+    if not (5.0 <= temperature <= 50.0):
+        errors.append(f"Temperature must be between 5°C and 50°C (entered: {temperature}°C).")
+    if not (0.0 <= fertilizer <= 500.0):
+        errors.append(f"Fertilizer must be between 0 and 500 kg/ha (entered: {fertilizer}).")
+    if not (0.0 <= pesticide <= 20.0):
+        errors.append(f"Pesticide must be between 0 and 20 kg/ha (entered: {pesticide}).")
 
-    fig3 = go.Figure()
-    fig3.add_trace(go.Scatter(
-        x=fert_range, y=preds, mode="lines+markers",
-        line=dict(color="#76FF03", width=3),
-        marker=dict(color="#00C853", size=6),
-        fill="tozeroy", fillcolor="rgba(118,255,3,0.08)",
-    ))
-    fig3.add_vline(x=fertilizer, line_dash="dash", line_color="#FF6B35",
-                   annotation_text=f"Current: {fertilizer} kg/ha",
-                   annotation_font_color="#FF6B35")
-    fig3 = dark_layout(fig3, "How Fertilizer Amount Affects Yield")
-    fig3.update_xaxes(title="Fertilizer (kg/ha)")
-    fig3.update_yaxes(title="Yield (tons/ha)")
-    fig3.update_layout(height=350)
-    st.plotly_chart(fig3, use_container_width=True)
+    if errors:
+        invalid_msg(errors)
+    else:
+        try:
+            crop_enc   = encoders["crop"].transform([crop])[0]
+            state_enc  = encoders["state"].transform([state])[0]
+            season_enc = encoders["season"].transform([season])[0]
+        except:
+            crop_enc   = CROPS.index(crop)
+            state_enc  = STATES.index(state)
+            season_enc = SEASONS.index(season)
+
+        X = np.array([[crop_enc, state_enc, season_enc, area, rainfall, temperature, fertilizer, pesticide]])
+        pred = float(yield_model.predict(X)[0])
+        total = pred * area
+
+        st.markdown('<div class="section-header">🎯 Prediction Results</div>', unsafe_allow_html=True)
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Yield (tons/ha)", f"{pred:.2f}")
+        c2.metric("Total Yield",     f"{total:.1f} tons")
+        c3.metric("Farm Area",       f"{area} ha")
+        c4.metric("Season",          season)
+
+        st.markdown(f"""
+        <div class="result-card">
+            <div style="font-size:3.5rem;">🌾</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:800;color:#76FF03;">
+                {pred:.2f} <span style="font-size:1rem;">tons/ha</span>
+            </div>
+            <div style="color:#81C784;margin-top:0.5rem;">Expected Yield for {crop} in {season} season, {state}</div>
+            <div style="margin-top:1rem;color:#A5D6A7;">
+                📦 Total production on <b>{area} ha</b> farm: <b style="color:#00C853;">{total:.1f} tons</b>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Sensitivity analysis
+        st.markdown('<div class="section-header">📉 Fertilizer Sensitivity Analysis</div>', unsafe_allow_html=True)
+        fert_range = np.linspace(50, 450, 20)
+        preds = []
+        for fv in fert_range:
+            Xv = np.array([[crop_enc, state_enc, season_enc, area, rainfall, temperature, fv, pesticide]])
+            preds.append(float(yield_model.predict(Xv)[0]))
+
+        fig3 = go.Figure()
+        fig3.add_trace(go.Scatter(
+            x=fert_range, y=preds, mode="lines+markers",
+            line=dict(color="#76FF03", width=3),
+            marker=dict(color="#00C853", size=6),
+            fill="tozeroy", fillcolor="rgba(118,255,3,0.08)",
+        ))
+        fig3.add_vline(x=fertilizer, line_dash="dash", line_color="#FF6B35",
+                       annotation_text=f"Current: {fertilizer} kg/ha",
+                       annotation_font_color="#FF6B35")
+        fig3 = dark_layout(fig3, "How Fertilizer Amount Affects Yield")
+        fig3.update_xaxes(title="Fertilizer (kg/ha)")
+        fig3.update_yaxes(title="Yield (tons/ha)")
+        fig3.update_layout(height=350)
+        st.plotly_chart(fig3, use_container_width=True)

@@ -124,19 +124,7 @@ with tab1:
         )
         st.plotly_chart(fig2, use_container_width=True)
 
-    # Correlation heatmap
-    st.markdown('<div class="section-header">🔗 Feature Correlation Matrix</div>', unsafe_allow_html=True)
-    num_cols = ["N","P","K","temperature","humidity","ph","rainfall"]
-    corr = crop_df[num_cols].corr()
-    fig3 = go.Figure(go.Heatmap(
-        z=corr.values, x=num_cols, y=num_cols,
-        colorscale=[[0,"#0D1F0D"],[0.5,"#2E7D32"],[1,"#76FF03"]],
-        text=corr.values.round(2), texttemplate="%{text}",
-        showscale=True,
-    ))
-    fig3 = dark_layout(fig3, "Soil & Climate Feature Correlations")
-    fig3.update_layout(height=380)
-    st.plotly_chart(fig3, use_container_width=True)
+
 
 with tab2:
     c1, c2 = st.columns(2, gap="large")

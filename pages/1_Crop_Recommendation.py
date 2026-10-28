@@ -101,70 +101,105 @@ with col_right:
         st.plotly_chart(gauge_chart(P, "Phosphorus", 200, "#76FF03"), use_container_width=True)
         st.plotly_chart(gauge_chart(humidity, "Humidity", 100, "#40C4FF"), use_container_width=True)
 
-# ── Prediction ────────────────────────────────────────────────
-if predict_btn:
-    features = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
-    prediction = model.predict(features)[0]
-
-    # Top-5 probabilities
-    proba = model.predict_proba(features)[0]
-    classes = model.classes_
-    top5_idx = proba.argsort()[-5:][::-1]
-    top5 = [(classes[i], proba[i]*100) for i in top5_idx]
-
-    emoji = CROP_EMOJIS.get(prediction, "🌱")
-
+# ── Validation helper ─────────────────────────────────────────
+def invalid_msg(errors):
+    items = "".join(f"<li style='margin:4px 0;'>{e}</li>" for e in errors)
     st.markdown(f"""
-    <div class="result-card">
-        <div style="font-size:5rem;">{emoji}</div>
-        <div style="font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:800;color:#00C853;">
-            {prediction}
-        </div>
-        <div style="color:#81C784;font-size:1rem;margin-top:0.5rem;">
-            Recommended crop based on your soil & climate conditions
-        </div>
-        <div style="margin-top:1rem;background:#0A1A0A;border-radius:12px;padding:0.8rem;">
-            <span style="color:#76FF03;font-weight:700;font-size:1.1rem;">
-                {top5[0][1]:.1f}% Confidence
-            </span>
+    <div style="background:linear-gradient(135deg,#2A0D0D,#1A0909);border:2px solid #D32F2F;
+                border-radius:16px;padding:1.5rem 2rem;margin-top:1rem;">
+        <div style="font-size:2rem;text-align:center;">🚫</div>
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:1.3rem;font-weight:800;
+                    color:#EF5350;text-align:center;margin:0.4rem 0 1rem;">Invalid Input</div>
+        <ul style="color:#FFCDD2;font-size:0.9rem;line-height:1.8;padding-left:1.2rem;">{items}</ul>
+        <div style="color:#EF9A9A;font-size:0.8rem;margin-top:0.8rem;text-align:center;">
+            Please correct the highlighted fields and try again.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
-    # Top-5 chart
-    st.markdown('<div class="section-header">📊 Top 5 Crop Recommendations</div>', unsafe_allow_html=True)
-    names = [f"{CROP_EMOJIS.get(c,'🌱')} {c}" for c, _ in top5]
-    vals  = [v for _, v in top5]
-    fig = go.Figure(go.Bar(
-        x=vals, y=names, orientation="h",
-        marker=dict(color=vals, colorscale=[[0,"#1B5E20"],[1,"#00C853"]], showscale=False),
-        text=[f"{v:.1f}%" for v in vals], textposition="outside",
-    ))
-    fig = dark_layout(fig, "Prediction Confidence (%)")
-    fig.update_layout(height=280, yaxis=dict(autorange="reversed"))
-    st.plotly_chart(fig, use_container_width=True)
+# ── Prediction ────────────────────────────────────────────────
+if predict_btn:
+    errors = []
+    if N <= 0:
+        errors.append("Nitrogen (N) must be greater than 0 kg/ha.")
+    if P <= 0:
+        errors.append("Phosphorus (P) must be greater than 0 kg/ha.")
+    if K <= 0:
+        errors.append("Potassium (K) must be greater than 0 kg/ha.")
+    if not (3.0 <= ph <= 9.0):
+        errors.append(f"Soil pH must be between 3.0 and 9.0 (entered: {ph}).")
+    if not (5.0 <= temperature <= 50.0):
+        errors.append(f"Temperature must be between 5°C and 50°C (entered: {temperature}°C).")
+    if not (10.0 <= humidity <= 100.0):
+        errors.append(f"Humidity must be between 10% and 100% (entered: {humidity}%).")
+    if not (20.0 <= rainfall <= 400.0):
+        errors.append(f"Rainfall must be between 20mm and 400mm (entered: {rainfall}mm).")
 
-    # Input radar chart
-    st.markdown('<div class="section-header">🕸️ Parameter Radar</div>', unsafe_allow_html=True)
-    categories = ["Nitrogen", "Phosphorus", "Potassium", "Temperature", "Humidity", "pH×10", "Rainfall/10"]
-    vals_radar  = [N/200, P/200, K/250, temperature/50, humidity/100, ph/9, rainfall/400]
-    fig2 = go.Figure(go.Scatterpolar(
-        r=[v*100 for v in vals_radar] + [vals_radar[0]*100],
-        theta=categories + [categories[0]],
-        fill="toself",
-        fillcolor="rgba(0,200,83,0.15)",
-        line=dict(color="#00C853", width=2),
-    ))
-    fig2.update_layout(
-        polar=dict(
-            bgcolor="#0D1F0D",
-            radialaxis=dict(visible=True, range=[0,100], gridcolor="#1E3A1E", color="#81C784"),
-            angularaxis=dict(gridcolor="#1E3A1E", color="#81C784"),
-        ),
-        paper_bgcolor="rgba(0,0,0,0)",
-        font=dict(color="white"),
-        showlegend=False,
-        height=380,
-        margin=dict(l=40, r=40, t=20, b=20),
-    )
-    st.plotly_chart(fig2, use_container_width=True)
+    if errors:
+        invalid_msg(errors)
+    else:
+        features = np.array([[N, P, K, temperature, humidity, ph, rainfall]])
+        prediction = model.predict(features)[0]
+
+        # Top-5 probabilities
+        proba = model.predict_proba(features)[0]
+        classes = model.classes_
+        top5_idx = proba.argsort()[-5:][::-1]
+        top5 = [(classes[i], proba[i]*100) for i in top5_idx]
+
+        emoji = CROP_EMOJIS.get(prediction, "🌱")
+
+        st.markdown(f"""
+        <div class="result-card">
+            <div style="font-size:5rem;">{emoji}</div>
+            <div style="font-family:'Space Grotesk',sans-serif;font-size:2rem;font-weight:800;color:#00C853;">
+                {prediction}
+            </div>
+            <div style="color:#81C784;font-size:1rem;margin-top:0.5rem;">
+                Recommended crop based on your soil & climate conditions
+            </div>
+            <div style="margin-top:1rem;background:#0A1A0A;border-radius:12px;padding:0.8rem;">
+                <span style="color:#76FF03;font-weight:700;font-size:1.1rem;">
+                    {top5[0][1]:.1f}% Confidence
+                </span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Top-5 chart
+        st.markdown('<div class="section-header">📊 Top 5 Crop Recommendations</div>', unsafe_allow_html=True)
+        names = [f"{CROP_EMOJIS.get(c,'🌱')} {c}" for c, _ in top5]
+        vals  = [v for _, v in top5]
+        fig = go.Figure(go.Bar(
+            x=vals, y=names, orientation="h",
+            marker=dict(color=vals, colorscale=[[0,"#1B5E20"],[1,"#00C853"]], showscale=False),
+            text=[f"{v:.1f}%" for v in vals], textposition="outside",
+        ))
+        fig = dark_layout(fig, "Prediction Confidence (%)")
+        fig.update_layout(height=280, yaxis=dict(autorange="reversed"))
+        st.plotly_chart(fig, use_container_width=True)
+
+        # Input radar chart
+        st.markdown('<div class="section-header">🕸️ Parameter Radar</div>', unsafe_allow_html=True)
+        categories = ["Nitrogen", "Phosphorus", "Potassium", "Temperature", "Humidity", "pH×10", "Rainfall/10"]
+        vals_radar  = [N/200, P/200, K/250, temperature/50, humidity/100, ph/9, rainfall/400]
+        fig2 = go.Figure(go.Scatterpolar(
+            r=[v*100 for v in vals_radar] + [vals_radar[0]*100],
+            theta=categories + [categories[0]],
+            fill="toself",
+            fillcolor="rgba(0,200,83,0.15)",
+            line=dict(color="#00C853", width=2),
+        ))
+        fig2.update_layout(
+            polar=dict(
+                bgcolor="#0D1F0D",
+                radialaxis=dict(visible=True, range=[0,100], gridcolor="#1E3A1E", color="#81C784"),
+                angularaxis=dict(gridcolor="#1E3A1E", color="#81C784"),
+            ),
+            paper_bgcolor="rgba(0,0,0,0)",
+            font=dict(color="white"),
+            showlegend=False,
+            height=380,
+            margin=dict(l=40, r=40, t=20, b=20),
+        )
+        st.plotly_chart(fig2, use_container_width=True)
