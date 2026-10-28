@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from pathlib import Path
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from utils.helpers import BRAND, dark_layout
@@ -34,17 +35,29 @@ html,body,[class*="css"]{font-family:'Inter',sans-serif;background:#060e06;color
 st.markdown('<div class="section-header">📈 Crop Yield Prediction</div>', unsafe_allow_html=True)
 st.markdown('<p style="color:#81C784;">Predict expected crop yield (tons/hectare) using Gradient Boosting Regressor trained on diverse agronomic data.</p>', unsafe_allow_html=True)
 
+BASE_DIR = Path(__file__).resolve().parent.parent
+
 @st.cache_resource
 def load_models():
-    base = os.path.join(os.path.dirname(__file__), "..")
-    m = joblib.load(os.path.join(base, "models/yield_model.pkl"))
-    e = joblib.load(os.path.join(base, "models/yield_encoders.pkl"))
-    return m, e
+    model_path = BASE_DIR / "models" / "yield_model.pkl"
+    encoder_path = BASE_DIR / "models" / "yield_encoders.pkl"
+
+    if not model_path.is_file():
+        raise FileNotFoundError(f"Yield model not found: {model_path}")
+
+    if not encoder_path.is_file():
+        raise FileNotFoundError(f"Yield encoders not found: {encoder_path}")
+
+    model = joblib.load(model_path)
+    encoders = joblib.load(encoder_path)
+
+    return model, encoders
 
 try:
     yield_model, encoders = load_models()
-except:
-    st.error("⚠️ Model not found! Run `python models/train_models.py` first.")
+except Exception as exc:
+    st.error("Failed to load the yield prediction model.")
+    st.exception(exc)
     st.stop()
 
 CROPS  = ["Rice","Wheat","Maize","Cotton","Sugarcane","Soybean","Sunflower","Groundnut"]
